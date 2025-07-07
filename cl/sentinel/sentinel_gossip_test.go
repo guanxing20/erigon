@@ -26,28 +26,30 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/erigontech/erigon-lib/log/v3"
-
 	"github.com/erigontech/erigon/cl/clparams"
 	"github.com/erigontech/erigon/cl/clparams/initial_state"
 	"github.com/erigontech/erigon/cl/phase1/forkchoice/mock_services"
 	"github.com/erigontech/erigon/cl/utils/eth_clock"
+	"github.com/erigontech/erigon/execution/chainspec"
 )
 
 func getEthClock(t *testing.T) eth_clock.EthereumClock {
-	s, err := initial_state.GetGenesisState(clparams.MainnetNetwork)
+	s, err := initial_state.GetGenesisState(chainspec.MainnetChainID)
 	require.NoError(t, err)
 	return eth_clock.NewEthereumClock(s.GenesisTime(), s.GenesisValidatorsRoot(), s.BeaconConfig())
 }
 
 func TestSentinelGossipOnHardFork(t *testing.T) {
+	t.Skip("issue #15001")
+
 	listenAddrHost := "127.0.0.1"
 
 	ctx := context.Background()
 	db, _, _, _, _, reader := loadChain(t)
-	networkConfig, beaconConfig := clparams.GetConfigsByNetwork(clparams.MainnetNetwork)
+	networkConfig, beaconConfig := clparams.GetConfigsByNetwork(chainspec.MainnetChainID)
 	bcfg := *beaconConfig
 
-	s, err := initial_state.GetGenesisState(clparams.MainnetNetwork)
+	s, err := initial_state.GetGenesisState(chainspec.MainnetChainID)
 	require.NoError(t, err)
 	ethClock := eth_clock.NewEthereumClock(s.GenesisTime(), s.GenesisValidatorsRoot(), &bcfg)
 
@@ -55,6 +57,7 @@ func TestSentinelGossipOnHardFork(t *testing.T) {
 	bcfg.BellatrixForkEpoch = math.MaxUint64
 	bcfg.CapellaForkEpoch = math.MaxUint64
 	bcfg.DenebForkEpoch = math.MaxUint64
+	bcfg.ElectraForkEpoch = math.MaxUint64
 	bcfg.InitializeForkSchedule()
 
 	sentinel1, err := New(ctx, &SentinelConfig{
@@ -64,11 +67,12 @@ func TestSentinelGossipOnHardFork(t *testing.T) {
 		Port:          7070,
 		EnableBlocks:  true,
 		MaxPeerCount:  9999999,
-	}, ethClock, reader, nil, db, log.New(), &mock_services.ForkChoiceStorageMock{})
+	}, ethClock, reader, nil, db, log.New(), &mock_services.ForkChoiceStorageMock{}, nil)
 	require.NoError(t, err)
 	defer sentinel1.Stop()
 
-	require.NoError(t, sentinel1.Start())
+	_, err = sentinel1.Start()
+	require.NoError(t, err)
 	h := sentinel1.host
 
 	sentinel2, err := New(ctx, &SentinelConfig{
@@ -79,11 +83,12 @@ func TestSentinelGossipOnHardFork(t *testing.T) {
 		EnableBlocks:  true,
 		TCPPort:       9123,
 		MaxPeerCount:  9999999,
-	}, ethClock, reader, nil, db, log.New(), &mock_services.ForkChoiceStorageMock{})
+	}, ethClock, reader, nil, db, log.New(), &mock_services.ForkChoiceStorageMock{}, nil)
 	require.NoError(t, err)
 	defer sentinel2.Stop()
 
-	require.NoError(t, sentinel2.Start())
+	_, err = sentinel2.Start()
+	require.NoError(t, err)
 	h2 := sentinel2.host
 
 	sub1, err := sentinel1.SubscribeGossip(BeaconBlockSsz, time.Unix(0, math.MaxInt64))

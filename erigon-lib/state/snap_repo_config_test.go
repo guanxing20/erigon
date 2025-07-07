@@ -5,7 +5,6 @@ import (
 
 	"github.com/erigontech/erigon-lib/chain/snapcfg"
 	"github.com/erigontech/erigon-lib/common/datadir"
-	ae "github.com/erigontech/erigon-lib/state/appendable_extras"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,7 +78,7 @@ func TestFreezingRangeWithPreverified(t *testing.T) {
 	cfg := createConfig(t)
 	cfg.LoadPreverified([]snapcfg.PreverifiedItem{
 		{
-			Name: "v1-000000-000500-bodies.seg",
+			Name: "v1.0-000000-000500-bodies.seg",
 			Hash: "blahblah",
 		},
 	})
@@ -146,18 +145,18 @@ func TestFreezingRangeWithPreverified(t *testing.T) {
 	}
 }
 
-func createConfig(t *testing.T) *ae.SnapshotConfig {
+func createConfig(t *testing.T) *SnapshotConfig {
 	t.Helper()
 	dirs := datadir.New(t.TempDir())
 	stepSize := uint64(1000)
 
-	return ae.NewSnapshotConfig(
-		&ae.SnapshotCreationConfig{
+	return NewSnapshotConfig(
+		&SnapshotCreationConfig{
 			RootNumPerStep: stepSize,
 			MergeStages:    []uint64{10 * stepSize, 100 * stepSize},
 			MinimumSize:    stepSize,
 			SafetyMargin:   5,
 		},
-		ae.NewE2SnapSchema(dirs, "bodies"),
+		NewE2SnapSchema(dirs, "bodies"),
 	)
 }

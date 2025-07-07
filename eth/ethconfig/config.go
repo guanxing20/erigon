@@ -31,24 +31,35 @@ import (
 
 	"github.com/c2h5oh/datasize"
 
+	"github.com/erigontech/erigon-db/downloader/downloadercfg"
 	"github.com/erigontech/erigon-lib/chain"
 	"github.com/erigontech/erigon-lib/common"
 	"github.com/erigontech/erigon-lib/common/datadir"
-	"github.com/erigontech/erigon-lib/downloader/downloadercfg"
+	"github.com/erigontech/erigon-lib/estimate"
 	"github.com/erigontech/erigon-lib/kv/prune"
+	"github.com/erigontech/erigon-lib/types"
 	"github.com/erigontech/erigon/cl/clparams"
-	"github.com/erigontech/erigon/core/types"
-	"github.com/erigontech/erigon/eth/ethconfig/estimate"
 	"github.com/erigontech/erigon/eth/gasprice/gaspricecfg"
+	"github.com/erigontech/erigon/execution/chainspec"
 	"github.com/erigontech/erigon/execution/consensus/ethash/ethashcfg"
 	"github.com/erigontech/erigon/params"
 	"github.com/erigontech/erigon/rpc"
-	"github.com/erigontech/erigon/txnprovider/shutter"
+	"github.com/erigontech/erigon/txnprovider/shutter/shuttercfg"
 	"github.com/erigontech/erigon/txnprovider/txpool/txpoolcfg"
 )
 
 // BorDefaultMinerGasPrice defines the minimum gas price for bor validators to mine a transaction.
-var BorDefaultMinerGasPrice = big.NewInt(25 * params.GWei)
+var BorDefaultMinerGasPrice = big.NewInt(25 * common.GWei)
+
+// Fail-back block gas limit. Better specify one in the chain config.
+const DefaultBlockGasLimit uint64 = 45_000_000
+
+func DefaultBlockGasLimitByChain(config *Config) uint64 {
+	if config.Genesis == nil || config.Genesis.Config == nil || config.Genesis.Config.DefaultBlockGasLimit == nil {
+		return DefaultBlockGasLimit
+	}
+	return *config.Genesis.Config.DefaultBlockGasLimit
+}
 
 // FullNodeGPO contains default gasprice oracle settings for full node.
 var FullNodeGPO = gaspricecfg.Config{
@@ -91,8 +102,7 @@ var Defaults = Config{
 	NetworkID: 1,
 	Prune:     prune.DefaultMode,
 	Miner: params.MiningConfig{
-		GasLimit: 36_000_000,
-		GasPrice: big.NewInt(params.GWei),
+		GasPrice: big.NewInt(common.GWei),
 		Recommit: 3 * time.Second,
 	},
 	TxPool:      txpoolcfg.DefaultConfig,
@@ -139,7 +149,6 @@ type BlocksFreezing struct {
 	ProduceE2         bool // produce new block files
 	ProduceE3         bool // produce new state files
 	NoDownloader      bool // possible to use snapshots without calling Downloader
-	Verify            bool // verify snapshots on startup
 	DisableDownloadE3 bool // disable download state snapshots
 	DownloaderAddr    string
 	ChainName         string
@@ -207,12 +216,12 @@ type Config struct {
 	// Ethash options
 	Ethash ethashcfg.Config
 
-	Clique params.ConsensusSnapshotConfig
+	Clique chainspec.ConsensusSnapshotConfig
 	Aura   chain.AuRaConfig
 
 	// Transaction pool options
 	TxPool  txpoolcfg.Config
-	Shutter shutter.Config
+	Shutter shuttercfg.Config
 
 	// Gas Price Oracle options
 	GPO gaspricecfg.Config
@@ -235,15 +244,14 @@ type Config struct {
 	// Heimdall waypoint recording active
 	WithHeimdallWaypointRecording bool
 	// Use polygon checkpoint sync in preference to POW downloader
-	PolygonSync      bool
-	PolygonSyncStage bool
+	PolygonSync bool
 
 	// Ethstats service
 	Ethstats string
 	// Consensus layer
 	InternalCL bool
 
-	OverridePragueTime *big.Int `toml:",omitempty"`
+	OverrideOsakaTime *big.Int `toml:",omitempty"`
 
 	// Embedded Silkworm support
 	SilkwormExecution            bool
@@ -286,5 +294,5 @@ type Sync struct {
 	ChaosMonkey              bool
 	AlwaysGenerateChangesets bool
 	KeepExecutionProofs      bool
-	PersistReceipts          uint64
+	PersistReceiptsCacheV2   bool
 }
